@@ -1,0 +1,6 @@
+* spelldict
+Lexicon of spelling variants with embeddings
+
+* Literature hints:
+** [[http://arxiv.org/abs/1508.06615][Character-aware Neural Language Models]]
+** [[http://www.aclweb.org/anthology/W15-1502][Unsupervised Text Normalization Using Distributed Representations of Words and Phrases]]
