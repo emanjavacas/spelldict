@@ -11,25 +11,32 @@ def partition(lst, n):
         yield lst[ix:ix+n]
 
 
-class TokenIndexer(object):
+class Indexer(object):
     def __init__(self):
         self.decoder = {}
         self.encoder = {}
-        self.last = 1
+        self.last = 0
 
     def char_indexer(self):
-        """factory method that creates a char-level indexer based on
-        a previously learnt word-level indexer"""
-        indexer = TokenIndexer()
+        """
+        factory method that creates a char-level indexer
+        based on a previously learnt word-level indexer
+        """
+        indexer = Indexer()
         chars = set([c for w in self.encoder for c in w])
         for c in chars:
             indexer.encode(c)
         return indexer
 
+    def max_word_len(self):
+        return max([len(w) for w in self.encoder])
+
     def to_one_hot(self, n):
         vec = np.zeros(len(self.decoder), dtype=np.int8)
         vec[n] = 1
         return vec
+
+    # def random_vec(self, max_len):
 
     def _encode(self, s):
         idx = self.encoder.get(s, None)
@@ -54,37 +61,12 @@ class TokenIndexer(object):
             raise ValueError("Cannot found index [%d]" % idx)
         return self.decoder[idx]
 
-
-class SeqIndexer(object):
-    def __init__(self, pad='_'):
-        self.indexer = TokenIndexer()
-        self.pad = pad
-        self.indexer.encode(pad)
-
-    def encode(self, seq, size=10):
-        assert len(seq) <= size
-        ids = []
-        for t in seq:
-            idx = self.indexer.encode(t)
-            ids.append(idx)
-        margin = size - len(seq)
-        if margin:  # add padding
-            ids.extend(margin * [self.indexer.encode(self.pad)])
-        assert len(ids) == size
-        return ids
-
-    def decode(self, sent):
-        tkns = []
-        for idx in sent:
-            w = self.indexer.decode(idx)
-            tkns.append(w)
-        return tkns
-
-
 process_fns = [
     lambda x: re.sub(r'\[[^\]]+\]', "", x),
     lambda x: x.replace("|", ""),
-    lambda x: x.lower()
+    lambda x: x.lower(),
+    lambda x: x.split(),
+    lambda x: [w for w in x if '@' not in w]
 ]
 
 
@@ -100,59 +82,44 @@ def itertar(in_fn, process_fn=process_text):
         for tarinfo in tar:
             doc = tar.extractfile(tarinfo)
             for l in doc:
-                yield process_fn(l)
+                processed = process_fn(l)
+                if processed:
+                    yield processed
 
 
-def load_sents(text_generator, indexer, n_sents=100, ignore_missing=True):
-    """
-    Returns word-level indexed sents. Modifies the indexer as side effect.
-    Ignores words that include '@' used as missing character symbol.
-    """
-    sents = []
-    for line in text_generator:
-        sent = []
-        for word in line.strip().split():
-            if ignore_missing and '@' in word:
-                continue
-            sent.append(indexer.encode(word))
-        if sent:
-            sents.append(sent)
-    return sents
-
-
-def padding(char_idx, max_len, default=0):
-    "0 is a reserved index in our implementation"
-    if len(char_idx) == max_len:
-        return char_idx
-    if len(char_idx) > max_len:
+def padding(chars, max_len, default):
+    if len(chars) == max_len:
+        return chars
+    if len(chars) > max_len:
         raise ValueError("Sequence longer than max")
-    return (max_len - len(char_idx)) * [default] + char_idx
+    return (max_len - len(chars)) * [default] + chars
 
 
-def load_data(sents, word_indexer, char_indexer, max_word_len):
+def index_sents(sents):
+    indexer = Indexer()
+    idx_sents = []
+    for sent in sents:
+        idx_sent = []
+        for word in sent:
+            idx_sent.append(indexer.encode(word))
+        idx_sents.append(idx_sent)
+    return idx_sents, indexer
+
+
+def build_data(sents, word_indexer, char_indexer, default=' '):
     """
     Computes sents to tuples of prev-word, target-word
     transforming the former to one-hot-encoding matrix
     """
+    pad_id = char_indexer.encode(' ')
     for sent in sents:
         for i, target in enumerate(sent[1:]):
             prev_idx = sent[i]
-            prev_chars = [char_indexer.encode(c) for c in word_indexer.decode(prev_idx)]
-            yield (np.asarray(prev_emb), target)
-
-
-
-
-
-def construct_contexts(sents, context_len=5):
-    X, y = [], []
-    for sent in sents:
-        for i, target in enumerate(sent):
-            y.append(target)
-            offset = i - context_len
-            left = padding(offset) + sent[max(0, offset): i]
-            X.append(left)
-    return zip(X, y)
+            prev_chrs = [c for c in word_indexer.decode(prev_idx)]
+            prev_padd = padding(prev_chrs, word_indexer.max_word_len(), pad_id)
+            prev_embd = [char_indexer.encode(c, output="one_hot")
+                         for c in prev_padd]
+            yield (np.asarray(prev_embd), target)
 
 
 text = """from their godly endeavour, assuring themselves,\n
@@ -162,7 +129,26 @@ Princes and Ministers of State shew to their Clergy,\n
 by trusting them with their conscienbces and affaires\n"""
 
 
-word_indexer = TokenIndexer()
-sents = load_sents(text.split("\n"), word_indexer)
+sents = [process_text(sent) for sent in text.split('\n') if sent.split()]
+idx_sents, word_indexer = index_sents(sents)
 char_indexer = word_indexer.char_indexer()
-data = list(load_data(sents, word_indexer, char_indexer))
+data = build_data(idx_sents, word_indexer, char_indexer)
+
+
+def memoize(fn):
+    memo = {}
+
+    def wrapper(x):
+        in_memo = memo.get(x, None)
+        if in_memo:
+            print "in Memo!"
+            return in_memo
+        result = fn(x)
+        memo[x] = result
+        return result
+    return wrapper
+
+
+@memoize
+def add(pair):
+    return pair[0] + pair[1]
