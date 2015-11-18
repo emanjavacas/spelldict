@@ -1,28 +1,34 @@
 # encoding: utf-8
 
-from utils import partition, SeqIndexer
-import numpy as np
-from keras.layers import embeddings
+from keras.utils import np_utils
 from keras.models import Sequential
+from keras.layers.core import Dense, Dropout, Activation, Flatten
+from keras.layers.recurrent import LSTM
+from keras.layers.convolutional import Convolution1D, MaxPooling1D
 
-text = """from their godly endeavour, assuring themselves,
-that though bad Christians carp and repine
-at the confidence and respect which Catholick
-Princes and Ministers of State shew to their Clergy,
-by trusting them with their conscienbces and affaires"""
+from utils import build_data
 
-sent_size = 6
-matrix = []
-indexer = SeqIndexer()
-for sent in partition(text.split(), sent_size):
-    idxs = indexer.encode(sent, size=sent_size)
-    matrix.append(idxs)
+if __name__ == '__main__':
+    N_SENTS = 10000
+    RANDOM_STATE = 1001
+    BATCH_SIZE = 25
+    N_TARGETS = None
+    N_FILTERS = 2000
 
-matrix = np.array(matrix)
-n, p = matrix.shape
+    # load data
+    X, y, word_indexer, char_indexer = build_data(N_SENTS, N_TARGETS)
+    X = X.transpose(0, 2, 1)
+    y = np_utils.to_categorical(y, word_indexer.max)
 
-# character indexer
-indexer = SeqIndexer()
-max_size = max([len(w) for w in text.split()])
-for w in text.split():
-    id_w = indexer.encode(w, size=max_size)
+    # train-test split
+    max_train = 8 * len(X) / 10
+    X_train, y_train = X[:max_train], y[:max_train]
+
+    # model
+    model = Sequential()
+
+    # convolutions
+    model.add(Convolution1D(
+        input_dim=char_indexer.max,
+        nb_filter=N_FILTERS,
+    ))
