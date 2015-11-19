@@ -1,43 +1,45 @@
 # encoding: utf-8
-from collections import Counter, Iterable
+from collections import Counter
 
 
 def padding(chars, max_len, padder):
-    if len(chars) == max_len:
+    chars_len = len(chars)
+    if chars_len == max_len:
         return chars
-    if len(chars) > max_len:
-        raise ValueError("Sequence longer than max")
-    return (max_len - len(chars)) * [padder] + chars
+    if chars_len > max_len:
+        raise ValueError("Sequence of lenght [%d] longer than max [%d]"
+                         % (chars_len, max_len))
+    return (max_len - chars_len) * [padder] + chars
 
 
-def flatten(lst):
-    if not isinstance(lst, str) and isinstance(lst, Iterable):
-        for i in lst:
-            for subi in flatten(lst):
-                yield subi
+def flatten(lst, nested_types=(tuple, list)):
+    if isinstance(lst, nested_types):
+        for it in lst:
+            for subit in flatten(it):
+                yield subit
     else:
         yield lst
 
 
 class Indexer(object):
     def __init__(self):
+        self.freq = Counter()
         self.decoder = {}
         self.encoder = {}
-        self.freq = Counter()
         self.max = 0
 
     def vocab(self):
         return self.encoder.keys()
 
-    def most_common(self, n=None, indexed=True):
-        items = [w for (w, f) in self.freq.most_common(n)]
-        if indexed:
-            return [self.encode(i) for i in items]
-        else:
-            return items
+    def most_common(self, max_number=None):
+        return dict(self.freq.most_common(max_number))
 
     def encode(self, s):
-        self.freq[s] += 1
+        idx = self._encode(s)
+        self.freq[idx] += 1
+        return idx
+
+    def _encode(self, s):
         if s in self.encoder:
             return self.encoder[s]
         else:
@@ -52,9 +54,14 @@ class Indexer(object):
             raise ValueError("Cannot found index [%d]" % idx)
         return self.decoder[idx]
 
-    def fit(self, seqs):
-        for i in flatten(seqs):
-            self.encode(i)
+    def index(self, seqs):
+        indexed_seqs = []
+        for seq in seqs:
+            indexed_seq = []
+            for s in seq:
+                indexed_seq.append(self.encode(s))
+            indexed_seqs.append(indexed_seq)
+        return indexed_seqs
 
 
 class CharIndexer(Indexer):
@@ -65,9 +72,9 @@ class CharIndexer(Indexer):
         self.PAD, self.BOS, self.EOS = PAD, BOS, EOS
 
     @classmethod
-    def from_word_indexer(cls, word_indexer):
+    def from_vocabulary(cls, vocabulary):
         char_indexer = cls()
-        chars = set([c for w in word_indexer.vocab() for c in w])
+        chars = set([c for w in vocabulary for c in w])
         char_indexer.encode_word(''.join(chars))
         return char_indexer
 
