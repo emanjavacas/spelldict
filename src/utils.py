@@ -1,6 +1,6 @@
 # encoding: utf-8
 from indexer import Indexer, CharIndexer
-from text_preprocessing import process_text
+from collection import Counter
 
 import codecs
 import tarfile
@@ -8,7 +8,7 @@ import tarfile
 import numpy as np
 
 
-def numpy_one_hot(ints, n_rows, n_cols):
+def one_hot(ints, n_rows, n_cols):
     """
     computes the embedding matrix for a possibly padded word.
     `n_cols`: max word length in corpus
@@ -28,58 +28,63 @@ def take(gen, n):
         yield i
 
 
-def from_tar(in_fn='../data/postprocessed.tar.gz', process_fn=process_text):
+def from_tar(in_fn='../data/postprocessed.tar.gz'):
     """ generator over tokenized sents in tarred """
     with tarfile.open(in_fn, "r|*") as tar:
         for tarinfo in tar:
             for l in tar.extractfile(tarinfo):
-                processed = process_fn(l)
-                if processed:
-                    yield processed
+                yield l.split()
 
 
-def get_sents(in_fn='../data/merged.txt', process_fn=process_text):
+def get_sents(in_fn='../data/merged.txt'):
     with codecs.open(in_fn, 'r', 'utf-8') as f:
         for l in f:
-            processed = process_fn(l)
-            if processed:
-                yield processed
+            yield l.split()
 
 
-def build_contexts(sents, n_targets):
+def read_targets(n, in_fn='../data/targets.txt'):
+    with codecs.open(in_fn, 'r', 'utf-8') as f:
+        cnt = 0
+        for l in f:
+            if cnt >= n:
+                break
+            word, count = l.split('\t')
+            cnt += 1
+            yield word
+
+
+def get_targets(n, corpus):
+    counter = Counter((w for s in corpus for w in s))
+    return dict(counter.most_common(n)).keys()
+
+
+def build_contexts(sents, targets):
     """
-    Encode entire corpus with word_indexer (counts and indexes).
-    Extract targets from word_indexer.
     Build word-level encoded dataset and vocabulary.
-    Remove OOV words.
     Build character encoder based on vocabulary.
     Word_idx -> String -> Char_idxs
     """
     word_indexer = Indexer()
-    X, y, vocabulary = [], [], set()
-    indexed_sents = word_indexer.index(sents)
-    targets = word_indexer.most_common(n_targets)
-    for sent in indexed_sents:
+    X, y = [], []
+    for sent in sents:
         for i, target in enumerate(sent[1:]):
             if target not in targets:
                 continue
-            vocabulary.update([word_indexer.decode(target)])
-            vocabulary.update([word_indexer.decode(sent[i])])
-            X.append(sent[i])
-            y.append(target)
-    word_indexer.cut(vocabulary)
-    char_indexer = CharIndexer.from_vocabulary(vocabulary)
-    max_word_len = max([len(w) for w in vocabulary])
+            X.append(word_indexer.encode(sent[i]))
+            y.append(word_indexer.encode(target))
+    char_indexer = CharIndexer.from_vocabulary(word_indexer.vocab())
+    max_word_len = max([len(w) for w in word_indexer.vocab()])
     for i, word in enumerate(X):
         word_chars = word_indexer.decode(word)
         char_idxs = char_indexer.pad_encode(word_chars, max_word_len)
-        X[i] = numpy_one_hot(char_idxs, max_word_len + 2, char_indexer.max)
+        X[i] = one_hot(char_idxs, max_word_len + 2, char_indexer.vocab_len())
     return X, y, word_indexer, char_indexer
 
 
 def get_data(n_sents, n_targets):
     sents = take(get_sents(), n_sents)
-    X, y, word_indexer, char_indexer = build_contexts(sents, n_targets)
+    targets = get_targets(n_targets)
+    X, y, word_indexer, char_indexer = build_contexts(sents, targets)
     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
 
 

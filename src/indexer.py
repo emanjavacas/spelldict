@@ -1,5 +1,4 @@
 # encoding: utf-8
-from collections import Counter
 
 
 def padding(chars, max_len, padder):
@@ -23,37 +22,28 @@ def flatten(lst, nested_types=(tuple, list)):
 
 class Indexer(object):
     def __init__(self):
-        self.freq = Counter()
         self.decoder = {}
         self.encoder = {}
-        self.max = 0
+        self._max = 0
 
     def vocab(self):
         return self.encoder.keys()
 
-    def most_common(self, max_number=None):
-        return dict(self.freq.most_common(max_number))
-
-    def cut(self, vocabulary):
-        "reduces indexed items to match a new vocabulary"
-        for w, idx in self.encoder.items():
-            if w not in vocabulary:
-                del self.encoder[w]
-                del self.decoder[idx]
+    def vocab_len(self):
+        return len(self.vocab())
 
     def encode(self, s):
         idx = self._encode(s)
-        self.freq[idx] += 1
         return idx
 
     def _encode(self, s):
         if s in self.encoder:
             return self.encoder[s]
         else:
-            idx = self.max
+            idx = self._max
             self.encoder[s] = idx
             self.decoder[idx] = s
-            self.max += 1
+            self._max += 1
             return idx
 
     def decode(self, idx):

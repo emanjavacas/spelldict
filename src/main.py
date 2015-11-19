@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # load data
     X, y, word_indexer, char_indexer = get_data(N_SENTS, N_TARGETS)
     X = X.transpose(0, 2, 1)
-    y = np_utils.to_categorical(y, word_indexer.max)
+    y = np_utils.to_categorical(y, len(word_indexer.vocab()))
     print("finished loading data...")
 
     # train-test split
@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # convolutions
     model.add(Convolution1D(
-        input_dim=char_indexer.max,  # vector size
+        input_dim=len(char_indexer.vocab()),  # vector size
         nb_filter=N_FILTERS,
         filter_length=FILTER_LENGTH,
         activation="relu",
@@ -41,7 +41,11 @@ if __name__ == '__main__':
 
     model.add(MaxPooling1D(pool_length=2))
 
-    # model.add(LSTM((N_FILTERS/2, )))
+    # LSTM
+    model.add(LSTM((N_FILTERS/2, 250)))
+    model.add(Dropout(0.5))
+    model.add(Activation('relu'))
+    model.add(Dense(250, len(word_indexer.vocab())))
     model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
     model.fit(X_train, y_train, validation_split=0.2,
               batch_size=BATCH_SIZE, nb_epoch=25,
