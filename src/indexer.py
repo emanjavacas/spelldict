@@ -34,6 +34,13 @@ class Indexer(object):
     def most_common(self, max_number=None):
         return dict(self.freq.most_common(max_number))
 
+    def cut(self, vocabulary):
+        "reduces indexed items to match a new vocabulary"
+        for w, idx in self.encoder.items():
+            if w not in vocabulary:
+                del self.encoder[w]
+                del self.decoder[idx]
+
     def encode(self, s):
         idx = self._encode(s)
         self.freq[idx] += 1

@@ -13,7 +13,7 @@ if __name__ == '__main__':
     RANDOM_STATE = 1001
     BATCH_SIZE = 25
     N_TARGETS = 5000
-    N_FILTERS = 2000
+    N_FILTERS = 1000
     FILTER_LENGTH = 3
 
     # load data

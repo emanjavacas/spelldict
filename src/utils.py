@@ -51,6 +51,7 @@ def build_contexts(sents, n_targets):
     Encode entire corpus with word_indexer (counts and indexes).
     Extract targets from word_indexer.
     Build word-level encoded dataset and vocabulary.
+    Remove OOV words.
     Build character encoder based on vocabulary.
     Word_idx -> String -> Char_idxs
     """
@@ -66,6 +67,7 @@ def build_contexts(sents, n_targets):
             vocabulary.update([word_indexer.decode(sent[i])])
             X.append(sent[i])
             y.append(target)
+    word_indexer.cut(vocabulary)
     char_indexer = CharIndexer.from_vocabulary(vocabulary)
     max_word_len = max([len(w) for w in vocabulary])
     for i, word in enumerate(X):
