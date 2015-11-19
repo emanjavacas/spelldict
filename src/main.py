@@ -20,6 +20,7 @@ if __name__ == '__main__':
     X, y, word_indexer, char_indexer = get_data(N_SENTS, N_TARGETS)
     X = X.transpose(0, 2, 1)
     y = np_utils.to_categorical(y, word_indexer.max)
+    print("finished loading data...")
 
     # train-test split
     max_train = 8 * len(X) / 10
@@ -44,4 +45,4 @@ if __name__ == '__main__':
     model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
     model.fit(X_train, y_train, validation_split=0.2,
               batch_size=BATCH_SIZE, nb_epoch=25,
-              show_accuracy=True, show_accuracy=True)
+              show_accuracy=True, verbose=1)
