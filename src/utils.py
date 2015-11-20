@@ -2,6 +2,7 @@
 from indexer import Indexer, CharIndexer
 from collections import Counter
 
+import os
 import codecs
 import tarfile
 
@@ -36,10 +37,13 @@ def from_tar(in_fn='../data/postprocessed.tar.gz'):
                 yield l.split()
 
 
-def get_sents(in_fn='../data/merged.txt'):
-    with codecs.open(in_fn, 'r', 'utf-8') as f:
-        for l in f:
-            yield l.split()
+def get_sents(in_dir):
+    fns = os.listdir(in_dir)
+    for fn in fns:
+        path = os.path.join(in_dir, fn)
+        with codecs.open(path, 'r', 'utf-8') as f:
+            for l in f:
+                yield l.split()
 
 
 def read_targets(n, in_fn='../data/targets.txt'):
@@ -70,22 +74,20 @@ def build_contexts(sents, targets):
     for sent in sents:
         for i, target in enumerate(sent[1:]):
             if target not in targets:
-                print target.encode('utf-8')
                 continue
             y.append(word_indexer.encode(target))
             char_idxs = char_indexer.encode_word(sent[i])
             max_word_len = max(max_word_len, len(char_idxs))
             X.append(char_idxs)
-    print max_word_len
     for i, word in enumerate(X):
         padded_idxs = char_indexer.pad(word, max_word_len)
         X[i] = one_hot(padded_idxs, max_word_len, char_indexer.vocab_len())
     return X, y, word_indexer, char_indexer
 
 
-def get_data(n_sents, n_targets):
-    sents = take(get_sents(), n_sents)
-    targets = get_targets(n_targets)
+def get_data(in_dir, n_sents, n_targets):
+    sents = take(get_sents(in_dir), n_sents)
+    targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
     X, y, word_indexer, char_indexer = build_contexts(sents, targets)
     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
 
@@ -96,7 +98,7 @@ def get_data(n_sents, n_targets):
 # Princes and Ministers of State shew to their Clergy,\n
 # by trusting them with their conscienbces and affaires\n"""
 # sents = [sent.split() for sent in text.split('\n') if sent.split()]
-sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
-targets = get_targets(1000, sents)
-sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
-X, y, word, char = build_contexts(sents, targets)
+# sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
+# targets = get_targets(1000, sents)
+# sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
+# X, y, word, char = build_contexts(sents, targets)
