@@ -19,7 +19,7 @@ if __name__ == '__main__':
     FILTER_LENGTH = 3
 
     # load data
-    X, y, word_indexer, char_indexer = get_data('/home/enrique/data/EEBO/sample/post/', N_SENTS, N_TARGETS)
+    X, y, word_indexer, char_indexer = get_data('../data/post/', N_SENTS, N_TARGETS)
     # X = X.transpose(0, 2, 1)
     y = np_utils.to_categorical(y, len(word_indexer.vocab()))
     print("finished loading data...")

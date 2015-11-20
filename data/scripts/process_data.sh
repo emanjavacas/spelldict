@@ -2,7 +2,7 @@ IN=$1
 OUT=$2
 TMP=$OUT/tmp/
 N=200
-SPLITTA=/Users/quique/code/python/splitta/
+SPLITTA=/home/enrique/code/splitta.1.03
 
 mkdir $TMP
 
