@@ -30,13 +30,9 @@ class Indexer(object):
         return self.encoder.keys()
 
     def vocab_len(self):
-        return len(self.vocab())
+        return len(self.encoder)
 
     def encode(self, s):
-        idx = self._encode(s)
-        return idx
-
-    def _encode(self, s):
         if s in self.encoder:
             return self.encoder[s]
         else:
@@ -52,6 +48,7 @@ class Indexer(object):
         return self.decoder[idx]
 
     def index(self, seqs):
+        """encode a corpus"""
         indexed_seqs = []
         for seq in seqs:
             indexed_seq = []
@@ -62,6 +59,7 @@ class Indexer(object):
 
 
 class CharIndexer(Indexer):
+    """Indexer sub-class that knows how to pad itself"""
     def __init__(self, PAD=" ", BOS="<", EOS=">"):
         super(CharIndexer, self).__init__()
         for s in [PAD, BOS, EOS]:
@@ -70,15 +68,17 @@ class CharIndexer(Indexer):
 
     @classmethod
     def from_vocabulary(cls, vocabulary):
+        """factory method that creates a character encoder
+        based on a vocabulary. The vocabulary can originate
+        from an indexer of words"""
         char_indexer = cls()
         chars = set([c for w in vocabulary for c in w])
         char_indexer.encode_word(''.join(chars))
         return char_indexer
 
-    def pad_encode(self, word, max_word_len):
-        encoded = self.encode_word(word)
+    def pad(self, char_idxs, max_len):
         pad_idx = self.encode(self.PAD)
-        return padding(encoded, max_word_len + 2, pad_idx)
+        return padding(char_idxs, max_len, pad_idx)
 
     def encode_word(self, word):
         word = self.BOS + word + self.EOS

@@ -1,6 +1,6 @@
 # encoding: utf-8
 from indexer import Indexer, CharIndexer
-from collection import Counter
+from collections import Counter
 
 import codecs
 import tarfile
@@ -60,24 +60,26 @@ def get_targets(n, corpus):
 
 def build_contexts(sents, targets):
     """
-    Build word-level encoded dataset and vocabulary.
-    Build character encoder based on vocabulary.
-    Word_idx -> String -> Char_idxs
+    Word-level encoding of target words. Character-level encoding
+    of contexts.
     """
     word_indexer = Indexer()
+    char_indexer = CharIndexer()
     X, y = [], []
+    max_word_len = 0
     for sent in sents:
         for i, target in enumerate(sent[1:]):
             if target not in targets:
+                print target.encode('utf-8')
                 continue
-            X.append(word_indexer.encode(sent[i]))
             y.append(word_indexer.encode(target))
-    char_indexer = CharIndexer.from_vocabulary(word_indexer.vocab())
-    max_word_len = max([len(w) for w in word_indexer.vocab()])
+            char_idxs = char_indexer.encode_word(sent[i])
+            max_word_len = max(max_word_len, len(char_idxs))
+            X.append(char_idxs)
+    print max_word_len
     for i, word in enumerate(X):
-        word_chars = word_indexer.decode(word)
-        char_idxs = char_indexer.pad_encode(word_chars, max_word_len)
-        X[i] = one_hot(char_idxs, max_word_len + 2, char_indexer.vocab_len())
+        padded_idxs = char_indexer.pad(word, max_word_len)
+        X[i] = one_hot(padded_idxs, max_word_len, char_indexer.vocab_len())
     return X, y, word_indexer, char_indexer
 
 
@@ -94,3 +96,7 @@ def get_data(n_sents, n_targets):
 # Princes and Ministers of State shew to their Clergy,\n
 # by trusting them with their conscienbces and affaires\n"""
 # sents = [sent.split() for sent in text.split('\n') if sent.split()]
+sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
+targets = get_targets(1000, sents)
+sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
+X, y, word, char = build_contexts(sents, targets)
