@@ -8,19 +8,21 @@ from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 
-from utils import get_data
+from utils import get_data, save_model
 
 if __name__ == '__main__':
     N_SENTS = 20000
     RANDOM_STATE = 1001
     BATCH_SIZE = 25
+    NB_EPOCH = 15
     N_TARGETS = 5000
     N_FILTERS = 1000
     FILTER_LENGTH = 3
 
     # load data
     X, y, word_indexer, char_indexer = get_data('../data/post/', N_SENTS, N_TARGETS)
-    # X = X.transpose(0, 2, 1)
+    word_indexer.save('word_indexer.pkl')
+    char_indexer.save('char_indexer.pkl')
     y = np_utils.to_categorical(y, len(word_indexer.vocab()))
     print("finished loading data...")
     print("number of instances: [%d]" % len(y))
@@ -52,7 +54,8 @@ if __name__ == '__main__':
     model.add(Dense(len(word_indexer.vocab()), input_dim=250))
     model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
     model.fit(X_train, y_train, validation_split=0.2,
-              batch_size=BATCH_SIZE, nb_epoch=25,
+              batch_size=BATCH_SIZE, nb_epoch=NB_EPOCH,
               show_accuracy=True, verbose=1)
-    
-    pkl_utils.dump(model, 'model.zip')
+
+    # save
+    save_model(model, 'model.pkl')

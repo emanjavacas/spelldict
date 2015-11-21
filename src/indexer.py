@@ -1,4 +1,5 @@
 # encoding: utf-8
+import cPickle as p
 
 
 def padding(chars, max_len, padder):
@@ -48,7 +49,7 @@ class Indexer(object):
         return self.decoder[idx]
 
     def index(self, seqs):
-        """encode a corpus"""
+        """encode a corpus. You could call it fit_transform"""
         indexed_seqs = []
         for seq in seqs:
             indexed_seq = []
@@ -56,6 +57,15 @@ class Indexer(object):
                 indexed_seq.append(self.encode(s))
             indexed_seqs.append(indexed_seq)
         return indexed_seqs
+
+    def save(self, filename):
+        with open(filename, 'wb') as f:
+            p.dump(self, f)
+
+    @classmethod
+    def load(self, filename):
+        with open(filename, 'rb') as f:
+            return p.load(f)
 
 
 class CharIndexer(Indexer):
@@ -83,3 +93,8 @@ class CharIndexer(Indexer):
     def encode_word(self, word):
         word = self.BOS + word + self.EOS
         return [self.encode(c) for c in word]
+
+    def decode_word(self, *idxs):
+        """note that indexer.decode_word(indexer.encode_word(arg)) != word
+        given that BOS and EOS characters might be appended by encode_word"""
+        return ''.join([self.decode(c) for c in idxs])

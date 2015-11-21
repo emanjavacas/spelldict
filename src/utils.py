@@ -5,8 +5,20 @@ from collections import Counter
 import os
 import codecs
 import tarfile
+import cPickle as p
 
 import numpy as np
+
+
+def save_model(model, fname):
+    with open(fname, 'wb') as f:
+        p.dump(model, f)
+
+
+def load_model(fname):
+    with open(fname, 'rb') as f:
+        model = p.load(f)
+    return model
 
 
 def one_hot(ints, n_rows, n_cols):
