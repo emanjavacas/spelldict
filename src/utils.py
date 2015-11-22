@@ -2,23 +2,12 @@
 from indexer import Indexer, CharIndexer
 from collections import Counter
 
+import cPickle as p
 import os
 import codecs
 import tarfile
-import cPickle as p
 
 import numpy as np
-
-
-def save_model(model, fname):
-    with open(fname, 'wb') as f:
-        p.dump(model, f)
-
-
-def load_model(fname):
-    with open(fname, 'rb') as f:
-        model = p.load(f)
-    return model
 
 
 def one_hot(ints, n_rows, n_cols):
@@ -39,6 +28,11 @@ def take(gen, n):
             break
         cnt += 1
         yield i
+
+
+def save_model(model, fname):
+    with open(fname, 'wb') as f:
+        p.dump(model, f)
 
 
 def from_tar(in_fn='../data/postprocessed.tar.gz'):
@@ -74,7 +68,7 @@ def get_targets(n, corpus):
     return dict(counter.most_common(n)).keys()
 
 
-def build_contexts(sents, targets):
+def build_contexts(sents, targets, one_hot_encoding=True):
     """
     Word-level encoding of target words. Character-level encoding
     of contexts.
@@ -93,24 +87,17 @@ def build_contexts(sents, targets):
             X.append(char_idxs)
     for i, word in enumerate(X):
         padded_idxs = char_indexer.pad(word, max_word_len)
-        X[i] = one_hot(padded_idxs, max_word_len, char_indexer.vocab_len())
+        if one_hot_encoding:
+            X[i] = one_hot(padded_idxs,
+                           max_word_len,
+                           char_indexer.vocab_len())
+        else:
+            X[i] = padded_idxs
     return X, y, word_indexer, char_indexer
 
 
-def get_data(in_dir, n_sents, n_targets):
+def get_data(in_dir, n_sents, n_targets, **kwargs):
     sents = take(get_sents(in_dir), n_sents)
     targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
-    X, y, word_indexer, char_indexer = build_contexts(sents, targets)
+    X, y, word_indexer, char_indexer = build_contexts(sents, targets, **kwargs)
     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
-
-
-# text = """from their godly endeavour, assuring themselves,\n
-# that though bad Christians carp and repine\n
-# at the confidence and respect which Catholick\n
-# Princes and Ministers of State shew to their Clergy,\n
-# by trusting them with their conscienbces and affaires\n"""
-# sents = [sent.split() for sent in text.split('\n') if sent.split()]
-# sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
-# targets = get_targets(1000, sents)
-# sents = get_sents('../data/scripts/test_files_out/D00000998435240000.htm')
-# X, y, word, char = build_contexts(sents, targets)

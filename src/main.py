@@ -4,7 +4,8 @@ from theano.misc import pkl_utils
 
 from keras.utils import np_utils
 from keras.models import Sequential
-from keras.layers.core import Dense, Dropout, Activation, Flatten
+from keras.layers.core import Dense, Dropout, Activation
+from keras.layers.embeddings import Embedding
 from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 
@@ -16,14 +17,16 @@ if __name__ == '__main__':
     BATCH_SIZE = 25
     NB_EPOCH = 15
     N_TARGETS = 5000
-    N_FILTERS = 1000
+    N_FILTERS = 2000
     FILTER_LENGTH = 3
+    INPUT_TYPE = "one_hot"           # one_hot or input embedding dimension
 
     # load data
-    X, y, word_indexer, char_indexer = get_data('../data/post/', N_SENTS, N_TARGETS)
-    word_indexer.save('word_indexer.pkl')
-    char_indexer.save('char_indexer.pkl')
-    y = np_utils.to_categorical(y, len(word_indexer.vocab()))
+    X, y, word_idxr, char_idxr = \
+        get_data('../data/post/', N_SENTS, N_TARGETS,
+                 one_hot_encoding=True if INPUT_TYPE == "one_hot" else INPUT_TYPE)
+
+    y = np_utils.to_categorical(y, word_idxr.vocab_len())
     print("finished loading data...")
     print("number of instances: [%d]" % len(y))
     print("input instance shape: (%d, %d)" % (X[0].shape))
@@ -35,9 +38,13 @@ if __name__ == '__main__':
     # model
     model = Sequential()
 
+    # embeddings
+    if INPUT_TYPE != "one_hot":
+        model.add(Embedding(char_idxr.vocab_len(), INPUT_TYPE))
+
     # convolutions
     model.add(Convolution1D(
-        input_dim=len(char_indexer.vocab()),  # vector size
+        input_dim=INPUT_TYPE if INPUT_TYPE != "one_hot" else char_idxr.vocab_len(),
         nb_filter=N_FILTERS,
         filter_length=FILTER_LENGTH,
         activation="relu",
@@ -48,14 +55,15 @@ if __name__ == '__main__':
     model.add(MaxPooling1D(pool_length=2))
 
     # LSTM
-    model.add(LSTM(250, input_shape=(N_FILTERS/2, 1)))
+    model.add(LSTM(512, input_shape=(N_FILTERS/2, 1)))
     model.add(Dropout(0.5))
     model.add(Activation('relu'))
-    model.add(Dense(len(word_indexer.vocab()), input_dim=250))
+    model.add(Dense(word_idxr.vocab_len(), input_dim=512))
+    model.add(Activation('softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
     model.fit(X_train, y_train, validation_split=0.2,
               batch_size=BATCH_SIZE, nb_epoch=NB_EPOCH,
               show_accuracy=True, verbose=1)
 
-    # save
-    save_model(model, 'model.pkl')
+    print('pickling model...')
+    pkl_utils.dump(model, 'model.zip')
