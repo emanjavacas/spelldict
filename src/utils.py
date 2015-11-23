@@ -2,7 +2,7 @@
 from indexer import Indexer, CharIndexer
 from collections import Counter
 
-import cPickle as p
+from keras.models import model_from_json
 import os
 import codecs
 import tarfile
@@ -30,9 +30,22 @@ def take(gen, n):
         yield i
 
 
-def save_model(model, fname):
-    with open(fname, 'wb') as f:
-        p.dump(model, f)
+def save_model(model, word_indexer, char_indexer, fname):
+    word_indexer.save(fname + "_word.pkl")
+    char_indexer.save(fname + "_char.pkl")
+    with open(fname + "_arch.json", "w") as f:
+        f.write(model.to_json())
+    model.save_weights(fname + "_weights.h5")
+    return None
+    
+
+def load_model(fname):
+    with open(fname + "_arch.json", "r") as f:
+        model = model_from_json(f.read())
+    model.load_weights(fname + "_weights.h5")
+    word_indexer = Indexer.load(fname + "_word.pkl")
+    char_indexer = CharIndexer.load(fname + "_char.pkl")
+    return model, word_indexer, char_indexer
 
 
 def from_tar(in_fn='../data/postprocessed.tar.gz'):
@@ -70,8 +83,7 @@ def get_targets(n, corpus):
 
 def build_contexts(sents, targets, one_hot_encoding=True):
     """
-    Word-level encoding of target words. Character-level encoding
-    of contexts.
+    Word-level encoding of target words. Character-level encoding of contexts.
     """
     word_indexer = Indexer()
     char_indexer = CharIndexer()

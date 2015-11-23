@@ -62,7 +62,7 @@ class Indexer(object):
         with open(filename, 'wb') as f:
             p.dump(self, f)
 
-    @classmethod
+    @staticmethod
     def load(self, filename):
         with open(filename, 'rb') as f:
             return p.load(f)
@@ -76,7 +76,7 @@ class CharIndexer(Indexer):
             self.encode(s)
         self.PAD, self.BOS, self.EOS = PAD, BOS, EOS
 
-    @classmethod
+    @staticmethod
     def from_vocabulary(cls, vocabulary):
         """factory method that creates a character encoder
         based on a vocabulary. The vocabulary can originate

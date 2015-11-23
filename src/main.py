@@ -12,11 +12,11 @@ from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from utils import get_data, save_model
 
 if __name__ == '__main__':
-    N_SENTS = 20000
+    N_SENTS = 2000
     RANDOM_STATE = 1001
     BATCH_SIZE = 25
-    NB_EPOCH = 15
-    N_TARGETS = 5000
+    NB_EPOCH = 1
+    N_TARGETS = 50
     N_FILTERS = 2000
     FILTER_LENGTH = 3
     INPUT_TYPE = "one_hot"           # one_hot or input embedding dimension
@@ -65,5 +65,6 @@ if __name__ == '__main__':
               batch_size=BATCH_SIZE, nb_epoch=NB_EPOCH,
               show_accuracy=True, verbose=1)
 
-    print('pickling model...')
-    pkl_utils.dump(model, 'model.zip')
+    print('saving model...')
+    save_model(model, word_idxr, char_idxr, 'model')
+
