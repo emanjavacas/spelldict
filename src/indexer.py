@@ -2,14 +2,17 @@
 import cPickle as p
 
 
-def padding(chars, max_len, padder):
+def padding(chars, max_len, padder, pad_dir="left"):
     chars_len = len(chars)
     if chars_len == max_len:
         return chars
     if chars_len > max_len:
         raise ValueError("Sequence of lenght [%d] longer than max [%d]"
                          % (chars_len, max_len))
-    return (max_len - chars_len) * [padder] + chars
+    if pad_dir == "left":
+        return (max_len - chars_len) * [padder] + chars
+    if pad_dir == "right":
+        return chars + (max_len - chars_len) * [padder]
 
 
 def flatten(lst, nested_types=(tuple, list)):
@@ -83,18 +86,18 @@ class CharIndexer(Indexer):
         from an indexer of words"""
         char_indexer = cls()
         chars = set([c for w in vocabulary for c in w])
-        char_indexer.encode_word(''.join(chars))
+        char_indexer.encode_seq(''.join(chars))
         return char_indexer
 
-    def pad(self, char_idxs, max_len):
+    def pad(self, char_idxs, max_len, pad_dir):
         pad_idx = self.encode(self.PAD)
-        return padding(char_idxs, max_len, pad_idx)
+        return padding(char_idxs, max_len, pad_idx, pad_dir=pad_dir)
 
-    def encode_word(self, word):
+    def encode_seq(self, word):
         word = self.BOS + word + self.EOS
         return [self.encode(c) for c in word]
 
-    def decode_word(self, *idxs):
-        """note that indexer.decode_word(indexer.encode_word(arg)) != word
-        given that BOS and EOS characters might be appended by encode_word"""
+    def decode_seq(self, *idxs):
+        """note that indexer.decode_seq(indexer.encode_seq(arg)) != word
+        given that BOS and EOS characters might be appended by encode_seq"""
         return ''.join([self.decode(c) for c in idxs])

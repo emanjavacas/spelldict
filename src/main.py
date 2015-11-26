@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-from theano.misc import pkl_utils
-
 from keras.utils import np_utils
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
@@ -16,7 +14,7 @@ if __name__ == '__main__':
     RANDOM_STATE = 1001
     BATCH_SIZE = 25
     NB_EPOCH = 1
-    N_TARGETS = 50
+    N_TARGETS = 5000
     N_FILTERS = 2000
     FILTER_LENGTH = 3
     INPUT_TYPE = "one_hot"           # one_hot or input embedding dimension
@@ -24,7 +22,7 @@ if __name__ == '__main__':
     # load data
     X, y, word_idxr, char_idxr = \
         get_data('../data/post/', N_SENTS, N_TARGETS,
-                 one_hot_encoding=True if INPUT_TYPE == "one_hot" else INPUT_TYPE)
+            one_hot_encoding=True if INPUT_TYPE == "one_hot" else INPUT_TYPE)
 
     y = np_utils.to_categorical(y, word_idxr.vocab_len())
     print("finished loading data...")
@@ -67,4 +65,3 @@ if __name__ == '__main__':
 
     print('saving model...')
     save_model(model, word_idxr, char_idxr, 'model')
-
