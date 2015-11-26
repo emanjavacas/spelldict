@@ -76,7 +76,8 @@ class CharIndexer(Indexer):
     def __init__(self, PAD=" ", BOS="<", EOS=">"):
         super(CharIndexer, self).__init__()
         for s in [PAD, BOS, EOS]:
-            self.encode(s)
+            if s:
+                self.encode(s)
         self.PAD, self.BOS, self.EOS = PAD, BOS, EOS
 
     @staticmethod
@@ -92,6 +93,10 @@ class CharIndexer(Indexer):
     def pad(self, char_idxs, max_len, pad_dir):
         pad_idx = self.encode(self.PAD)
         return padding(char_idxs, max_len, pad_idx, pad_dir=pad_dir)
+
+    def pad_encode(self, word, max_len, pad_dir):
+        encoded = self.encode_seq(word)
+        return self.pad(encoded, max_len, pad_dir=pad_dir)
 
     def encode_seq(self, word):
         word = self.BOS + word + self.EOS
