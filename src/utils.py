@@ -110,9 +110,7 @@ def sliding_window(seq, size=2, fillvalue=None):
 
 
 def build_contexts(sents, targets=None, window=15, one_hot_enc=True, sep=" "):
-    """
-    Word-level encoding of target words. Character-level encoding of contexts.
-    """
+    "Word-level encoding of target words. Character-level encoding of contexts"
     word_indexer = Indexer()
     char_indexer = CharIndexer(PAD="|", BOS="", EOS="")
     X, y = [], []
