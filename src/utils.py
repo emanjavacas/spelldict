@@ -109,7 +109,7 @@ def sliding_window(seq, size=2, fillvalue=None):
         yield output
 
 
-def build_contexts(sents, targets=None, window=15, one_hot_enc=True, sep=" "):
+def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
     "Word-level encoding of target words. Character-level encoding of contexts"
     word_indexer = Indexer()
     char_indexer = CharIndexer(PAD="|", BOS="", EOS="")
@@ -124,7 +124,7 @@ def build_contexts(sents, targets=None, window=15, one_hot_enc=True, sep=" "):
             padded = left_idxs
             X.append(padded)
     for i, context in enumerate(X):
-        if one_hot_enc:
+        if encoding and encoding == "one_hot":
             X[i] = one_hot(context, window, char_indexer.vocab_len())
         else:
             X[i] = context
