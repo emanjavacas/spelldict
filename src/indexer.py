@@ -7,8 +7,8 @@ def padding(chars, max_len, padder, pad_dir="left"):
     if chars_len == max_len:
         return chars
     if chars_len > max_len:
-        raise ValueError("Sequence of lenght [%d] longer than max [%d]"
-                         % (chars_len, max_len))
+        msg = "Sequence lenght [%d] more than max [%d]" % (chars_len, max_len)
+        raise ValueError(msg)
     if pad_dir == "left":
         return (max_len - chars_len) * [padder] + chars
     if pad_dir == "right":

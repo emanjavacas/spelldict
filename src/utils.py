@@ -1,5 +1,6 @@
 # encoding: utf-8
 from collections import Counter
+from itertools import tee
 import os
 import codecs
 import tarfile
@@ -76,20 +77,24 @@ def read_targets(n, in_fn='../data/targets.txt'):
             yield word
 
 
+def targets_by_min(min_freq, corpus):
+    targets = set()
+    freqs = Counter()
+    for s in corpus:
+        for w in s:
+            if w in targets:
+                continue
+            freqs[w] += 1
+            if freqs[w] >= min_freq:
+                targets.update([w])
+    return list(targets)
+
+
 def get_targets(n, corpus, min_freq=False):
     """Get most frequent `n` targets. If `min_freq == True`,
     `n` is instead interpreted as a min frequency threshold"""
     if min_freq:
-        targets = set()
-        freqs = Counter()
-        for s in corpus:
-            for w in s:
-                if w in targets:
-                    continue
-                freqs[w] += 1
-                if freqs[w] >= min_freq:
-                    targets.update([w])
-        return list(targets)
+        return targets_by_min(min_freq, corpus)
     else:
         counter = Counter((w for s in corpus for w in s))
         return dict(counter.most_common(n)).keys()
@@ -114,15 +119,14 @@ def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
     word_indexer = Indexer()
     char_indexer = CharIndexer(PAD="|", BOS="", EOS="")
     X, y = [], []
-    for sent in sents:
+    for sent in sents:          # encoding
         for i, target in enumerate(sent):
             if targets and target not in targets:
                 continue
             y.append(word_indexer.encode(target))
             left = sep.join(sent[0:i])[-window:]
             left_idxs = char_indexer.pad_encode(left, window, pad_dir="left")
-            padded = left_idxs
-            X.append(padded)
+            X.append(left_idxs)
     for i, context in enumerate(X):
         if encoding and encoding == "one_hot":
             X[i] = one_hot(context, window, char_indexer.vocab_len())
@@ -132,7 +136,13 @@ def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
 
 
 def get_data(in_dir, n_sents, n_targets, **kwargs):
-    sents = take(get_sents(in_dir), n_sents)
-    targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
-    X, y, word_indexer, char_indexer = build_contexts(sents, targets, **kwargs)
+    s1, s2 = tee(take(get_sents(in_dir), n_sents))
+    targets = get_targets(n_targets, s1)
+    X, y, word_indexer, char_indexer = build_contexts(s2, targets, **kwargs)
     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
+
+
+def get_batches(in_dir, n_sents, n_targets, batch_size, **kwargs):
+    s1, s2 = tee(take(get_sents(in_dir), n_sents))
+    targets = get_targets(n_targets, s1)
+    X, y, word_indexer, char_indexer = build_contexts(s2, targets, **kwargs)
