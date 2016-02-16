@@ -25,7 +25,8 @@ from utils import get_sents, take
 # path = get_file('nietzsche.txt', origin=origin)
 # text = open(path).read().lower()
 
-text = "\n".join(take(get_sents(in_dir='../data/post/')), 10000)
+tokens = take(get_sents(in_dir='../data/post/'), 10000)
+text = "\n".join((" ".join(s) for s in tokens))
 print('corpus length:', len(text))
 
 chars = set(text)
@@ -87,7 +88,7 @@ for iteration in range(1, 60):
         generated = ''
         sentence = text[start_index: start_index + maxlen]
         generated += sentence
-        print('----- Generating with seed: "' + sentence + '"')
+        print('----- Generating with seed: "' + sentence.encode("utf-8") + '"')
         sys.stdout.write(generated)
 
         for iteration in range(400):
@@ -102,6 +103,6 @@ for iteration in range(1, 60):
             generated += next_char
             sentence = sentence[1:] + next_char
 
-            sys.stdout.write(next_char)
+            sys.stdout.write(next_char.encode("utf-8"))
             sys.stdout.flush()
         print()

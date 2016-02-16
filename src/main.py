@@ -11,11 +11,11 @@ from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from utils import get_data, save_model
 
 if __name__ == '__main__':
-    N_SENTS = 50000
+    N_SENTS = 100000
     RANDOM_STATE = 1001
     BATCH_SIZE = 50
-    NB_EPOCH = 50
-    N_TARGETS = 5000
+    NB_EPOCH = 10
+    N_TARGETS = 1000
     N_FILTERS = 2000
     FILTER_LENGTH = 3
     INPUT_TYPE = "one_hot"           # one_hot or input embedding dimension
