@@ -2,6 +2,7 @@
 from collections import Counter
 from itertools import tee
 import os
+import re
 import codecs
 import tarfile
 
@@ -63,7 +64,8 @@ def get_sents(in_dir):
         path = os.path.join(in_dir, fn)
         with codecs.open(path, 'r', 'utf-8') as f:
             for l in f:
-                yield l.split()
+                line = l.split()
+                yield [re.sub(r'[()]', '', w) for w in l]
 
 
 def read_targets(n, in_fn='../data/targets.txt'):

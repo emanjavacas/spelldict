@@ -1,7 +1,9 @@
 # encoding: utf-8
 
+from __future__ import division
+from canister.callback import DBCallback
+
 from keras.utils import np_utils
-from keras import callbacks
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
 from keras.layers.embeddings import Embedding
@@ -11,21 +13,28 @@ from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from utils import get_data, save_model
 
 if __name__ == '__main__':
-    N_SENTS = 100000
-    RANDOM_STATE = 1001
-    BATCH_SIZE = 50
-    NB_EPOCH = 10
-    N_TARGETS = 1000
-    N_FILTERS = 2000
-    FILTER_LENGTH = 3
-    INPUT_TYPE = "one_hot"           # one_hot or input embedding dimension
+    params = {
+        "N_SENTS": 200000,
+        "RANDOM_STATE": 1001,
+        "BATCH_SIZE": 50,
+        "NB_EPOCH": 10,
+        "TRAIN_TEST_SPLIT": 0.8,
+        "N_TARGETS": 1000,
+        "N_FILTERS": 2000,
+        "FILTER_LENGTH": 3,
+        "EMBEDDING_DIM": None,
+        "INPUT_TYPE": "one_hot" # one_hot or embedding (requires EMBEDDING_DIM)
+    }
 
-    remote = callbacks.RemoteMonitor(root="http://localhost:9000")
+    callback = DBCallback("CharConvLM", "tokenized", params)
 
     # load data
+    encoding = "one_hot" if params["INPUT_TYPE"] == "one_hot" else params["EMBEDDING_DIM"]
     X, y, word_idxr, char_idxr = \
-        get_data('../data/post/', N_SENTS, N_TARGETS,
-            encoding="one_hot" if INPUT_TYPE == "one_hot" else INPUT_TYPE)
+        get_data('../data/tokenized/', 
+                 params["N_SENTS"], 
+                 params["N_TARGETS"],
+                 encoding=encoding)
 
     y = np_utils.to_categorical(y, word_idxr.vocab_len())
     print("finished loading data...")
@@ -34,21 +43,24 @@ if __name__ == '__main__':
     print("starting first iteration")
 
     # train-test split
-    max_train = 8 * len(X) / 10
+    max_train = len(X) * params["TRAIN_TEST_SPLIT"]
     X_train, y_train = X[:max_train], y[:max_train]
 
     # model
     model = Sequential()
 
     # embeddings
-    if INPUT_TYPE != "one_hot":
-        model.add(Embedding(char_idxr.vocab_len(), INPUT_TYPE))
+    if params["EMBEDDING_DIM"]:
+        conv_input = embedding_dim = params["EMBEDDING_DIM"]
+        model.add(Embedding(char_idxr.vocab_len(), embedding_dim))
+    else:
+        conv_input = char_idxr.vocab_len()
 
     # convolutions
     model.add(Convolution1D(
-        input_dim=INPUT_TYPE if INPUT_TYPE != "one_hot" else char_idxr.vocab_len(),
-        nb_filter=N_FILTERS,
-        filter_length=FILTER_LENGTH,
+        input_dim=conv_input,
+        nb_filter=params["N_FILTERS"],
+        filter_length=params["FILTER_LENGTH"],
         activation="relu",
         border_mode="valid",    # no padding
         subsample_length=1
@@ -57,16 +69,23 @@ if __name__ == '__main__':
     model.add(MaxPooling1D(pool_length=2))
 
     # LSTM
-    model.add(LSTM(512, input_shape=(N_FILTERS/2, 1)))
+    model.add(LSTM(512, input_shape=(params["N_FILTERS"]/2, 1)))
+    
     model.add(Dropout(0.5))
     model.add(Activation('relu'))
+    
     model.add(Dense(word_idxr.vocab_len(), input_dim=512))
+    
     model.add(Activation('softmax'))
+    
     model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
-    model.fit(X_train, y_train, validation_split=0.2,
-              batch_size=BATCH_SIZE, nb_epoch=NB_EPOCH,
-              show_accuracy=True, verbose=1, callbacks=[remote])
+    model.fit(X_train, y_train,
+              validation_split=0.2,
+              batch_size=params["BATCH_SIZE"], 
+              nb_epoch=params["NB_EPOCH"],
+              show_accuracy=True,
+              verbose=1,
+              callbacks=[remote])
 
-    print('saving model...')
     fname = '/home/manjavacas/code/python/spelldict/models/model'
     save_model(model, word_idxr, char_idxr, fname)
