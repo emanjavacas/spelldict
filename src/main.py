@@ -29,10 +29,14 @@ if __name__ == '__main__':
     callback = DBCallback("CharConvLM", "tokenized", params)
 
     # load data
-    encoding = "one_hot" if params["INPUT_TYPE"] == "one_hot" else params["EMBEDDING_DIM"]
+    if params["INPUT_TYPE"] == "one_hot":
+        encoding = "one_hot"
+    else:
+        encoding = params["EMBEDDING_DIM"]
+
     X, y, word_idxr, char_idxr = \
-        get_data('../data/tokenized/', 
-                 params["N_SENTS"], 
+        get_data('../data/tokenized/',
+                 params["N_SENTS"],
                  params["N_TARGETS"],
                  encoding=encoding)
 
@@ -51,8 +55,8 @@ if __name__ == '__main__':
 
     # embeddings
     if params["EMBEDDING_DIM"]:
-        conv_input = embedding_dim = params["EMBEDDING_DIM"]
-        model.add(Embedding(char_idxr.vocab_len(), embedding_dim))
+        conv_input = params["EMBEDDING_DIM"]
+        model.add(Embedding(char_idxr.vocab_len(), conv_input))
     else:
         conv_input = char_idxr.vocab_len()
 
@@ -70,18 +74,18 @@ if __name__ == '__main__':
 
     # LSTM
     model.add(LSTM(512, input_shape=(params["N_FILTERS"]/2, 1)))
-    
+
     model.add(Dropout(0.5))
     model.add(Activation('relu'))
-    
+
     model.add(Dense(word_idxr.vocab_len(), input_dim=512))
-    
+
     model.add(Activation('softmax'))
-    
+
     model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
     model.fit(X_train, y_train,
               validation_split=0.2,
-              batch_size=params["BATCH_SIZE"], 
+              batch_size=params["BATCH_SIZE"],
               nb_epoch=params["NB_EPOCH"],
               show_accuracy=True,
               verbose=1,
