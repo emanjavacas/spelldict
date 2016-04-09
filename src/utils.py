@@ -64,8 +64,7 @@ def get_sents(in_dir):
         path = os.path.join(in_dir, fn)
         with codecs.open(path, 'r', 'utf-8') as f:
             for l in f:
-                line = l.split()
-                yield [re.sub(r'[()]', '', w) for w in l]
+                yield [re.sub(r'[()]', '', w) for w in l.split()]
 
 
 def read_targets(n, in_fn='../data/targets.txt'):
@@ -137,14 +136,28 @@ def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
     return X, y, word_indexer, char_indexer
 
 
+# def get_data(in_dir, n_sents, n_targets, **kwargs):
+#     # s1, s2 = tee(take(get_sents(in_dir), n_sents)) # assumes get_sents fits in mem
+#     sents = list(take(get_sents(in_dir), n_sents))
+#     targets = get_targets(n_targets, sents)
+#     X, y, word_indexer, char_indexer = build_contexts(sents, targets, **kwargs)
+#     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
+
 def get_data(in_dir, n_sents, n_targets, **kwargs):
-    s1, s2 = tee(take(get_sents(in_dir), n_sents))
-    targets = get_targets(n_targets, s1)
-    X, y, word_indexer, char_indexer = build_contexts(s2, targets, **kwargs)
+    # mem efficient (build 2 gens)
+    targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
+    X, y, word_indexer, char_indexer = \
+        build_contexts(take(get_sents(in_dir), n_sents), targets, **kwargs)
     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
 
 
-def get_batches(in_dir, n_sents, n_targets, batch_size, **kwargs):
-    s1, s2 = tee(take(get_sents(in_dir), n_sents))
-    targets = get_targets(n_targets, s1)
-    X, y, word_indexer, char_indexer = build_contexts(s2, targets, **kwargs)
+def get_batches(in_dir, n_sents, n_targets, batch_size, w_idxr, c_idxr, **kwargs):
+    # assumes X, y fit in memory
+    targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
+    X, y, word_indexer, char_indexer = \
+        build_contexts(take(get_sents(in_dir), n_sents), targets, **kwargs)
+    w_idxr = word_indexer
+    c_idxr = char_indexer
+    for start in range(0, y.shape[0], batch_size):
+        end = start + batch_size
+        yield X[start:end], y[start:end]

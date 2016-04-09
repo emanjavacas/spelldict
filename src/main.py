@@ -4,12 +4,8 @@ from __future__ import division
 from canister.callback import DBCallback
 
 from keras.utils import np_utils
-from keras.models import Sequential
-from keras.layers.core import Dense, Dropout, Activation
-from keras.layers.embeddings import Embedding
-from keras.layers.recurrent import LSTM
-from keras.layers.convolutional import Convolution1D, MaxPooling1D
 
+from model import model
 from utils import get_data, save_model
 
 if __name__ == '__main__':
@@ -23,10 +19,9 @@ if __name__ == '__main__':
         "N_FILTERS": 2000,
         "FILTER_LENGTH": 3,
         "EMBEDDING_DIM": None,
-        "INPUT_TYPE": "one_hot" # one_hot or embedding (requires EMBEDDING_DIM)
+        # one_hot or embedding (requires EMBEDDING_DIM)
+        "INPUT_TYPE": "one_hot"
     }
-
-    callback = DBCallback("CharConvLM", "tokenized", params)
 
     # load data
     if params["INPUT_TYPE"] == "one_hot":
@@ -40,56 +35,35 @@ if __name__ == '__main__':
                  params["N_TARGETS"],
                  encoding=encoding)
 
-    y = np_utils.to_categorical(y, word_idxr.vocab_len())
+    # add post-processing experiment params
+    embedding_input = char_idxr.vocab_len()
+    n_classes = word_idxr.vocab_len()
+    params.update({"EMBEDDING_INPUT": embedding_input,
+                   "N_CLASSES": n_classes})
+
+    # canister callback
+    callback = DBCallback("CharConvLM", "tokenized", params)
+
+    y = np_utils.to_categorical(y, n_classes)
     print("finished loading data...")
     print("number of instances: [%d]" % len(y))
     print("input instance shape: (%d, %d)" % (X[0].shape))
     print("starting first iteration")
 
     # train-test split
+    # TODO: add train mode params (on_batches, batch_size)
     max_train = len(X) * params["TRAIN_TEST_SPLIT"]
     X_train, y_train = X[:max_train], y[:max_train]
 
     # model
-    model = Sequential()
-
-    # embeddings
-    if params["EMBEDDING_DIM"]:
-        conv_input = params["EMBEDDING_DIM"]
-        model.add(Embedding(char_idxr.vocab_len(), conv_input))
-    else:
-        conv_input = char_idxr.vocab_len()
-
-    # convolutions
-    model.add(Convolution1D(
-        input_dim=conv_input,
-        nb_filter=params["N_FILTERS"],
-        filter_length=params["FILTER_LENGTH"],
-        activation="relu",
-        border_mode="valid",    # no padding
-        subsample_length=1
-    ))
-
-    model.add(MaxPooling1D(pool_length=2))
-
-    # LSTM
-    model.add(LSTM(512, input_shape=(params["N_FILTERS"]/2, 1)))
-
-    model.add(Dropout(0.5))
-    model.add(Activation('relu'))
-
-    model.add(Dense(word_idxr.vocab_len(), input_dim=512))
-
-    model.add(Activation('softmax'))
-
-    model.compile(loss='categorical_crossentropy', optimizer='RMSprop')
+    m = model(**params)
     model.fit(X_train, y_train,
               validation_split=0.2,
               batch_size=params["BATCH_SIZE"],
               nb_epoch=params["NB_EPOCH"],
               show_accuracy=True,
               verbose=1,
-              callbacks=[remote])
+              callbacks=[callback])
 
     fname = '/home/manjavacas/code/python/spelldict/models/model'
     save_model(model, word_idxr, char_idxr, fname)
