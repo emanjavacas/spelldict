@@ -7,21 +7,22 @@ from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 
 
-def model(EMBEDDING_INPUT, EMBEDDING_DIM, N_FILTERS, FILTER_LENGTH, N_CLASSES):
+def get_model(embedding_input, embedding_dim, n_filters, filter_length,
+          n_classes, **kwargs):
     m = Sequential()
 
     # embeddings
-    if EMBEDDING_DIM:
-        conv_input = EMBEDDING_DIM
-        model.add(Embedding(EMBEDDING_INPUT, conv_input))
+    if embedding_dim:
+        conv_input = embedding_dim
+        model.add(embedding(embedding_input, conv_input))
     else:
-        conv_input = EMBEDDING_INPUT
+        conv_input = embedding_input
 
     # convolutions
-    model.add(Convolution1D(
+    m.add(Convolution1D(
         input_dim=conv_input,
-        nb_filter=N_FILTERS,
-        filter_length=FILTER_LENGTH,
+        nb_filter=n_filters,
+        filter_length=filter_length,
         activation="relu",
         border_mode="valid",    # no padding
         subsample_length=1
@@ -30,14 +31,15 @@ def model(EMBEDDING_INPUT, EMBEDDING_DIM, N_FILTERS, FILTER_LENGTH, N_CLASSES):
     m.add(MaxPooling1D(pool_length=2))
 
     # LSTM
-    m.add(LSTM(512, input_shape=(N_FILTERS/2, 1)))
+    m.add(LSTM(512, input_shape=(n_filters/2, 1)))
 
     m.add(Dropout(0.5))
     m.add(Activation('relu'))
 
-    m.add(Dense(N_CLASSES, input_dim=512))
-
+    m.add(Dense(n_classes, input_dim=512))
+    m.add(Dropout(0.5))
     m.add(Activation('softmax'))
 
+    m.summary()
     m.compile(loss='categorical_crossentropy', optimizer='RMSprop')
     return m

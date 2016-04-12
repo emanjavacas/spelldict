@@ -3,6 +3,7 @@ from collections import Counter
 from itertools import tee
 import os
 import re
+import sys
 import codecs
 import tarfile
 
@@ -23,6 +24,20 @@ def one_hot(ints, n_rows, n_cols):
     return mat
 
 
+def ppl(model, X_test, y_test):
+    n_test = test_data.shape[0]
+    n_test_chunks = n_test / chunk +1
+    total_score = 0
+    for chunk_idx in xrange(n_test_chunks):
+        test_chunk_x = test_data[chunk_idx*chunk:(chunk_idx+1)*chunk,:-1]
+        test_chunk_y = test_data[chunk_idx*chunk:(chunk_idx+1)*chunk,-1]
+        log_proba = np.log(model.predict(test_chunk_x))
+        predictions = log_proba[np.arange(test_chunk_x.shape[0]),test_chunk_y]
+        total_score += np.sum(predictions)
+
+    print "Words: %d, Perplexity %f" % (n_test,np.exp(-1*total_score/n_test))
+
+
 def take(gen, n):
     cnt = 0
     for i in gen:
@@ -38,7 +53,6 @@ def save_model(model, word_indexer, char_indexer, fname):
     with open(fname + "_arch.json", "w") as f:
         f.write(model.to_json())
     model.save_weights(fname + "_weights.h5")
-    return None
 
 
 def load_model(fname):
@@ -78,7 +92,8 @@ def read_targets(n, in_fn='../data/targets.txt'):
             yield word
 
 
-def targets_by_min(min_freq, corpus):
+def get_targets_by_min_freq(min_freq, corpus):
+    "return words with at least frequency 'min_freq'"
     targets = set()
     freqs = Counter()
     for s in corpus:
@@ -91,14 +106,11 @@ def targets_by_min(min_freq, corpus):
     return list(targets)
 
 
-def get_targets(n, corpus, min_freq=False):
+def get_targets(n, corpus):
     """Get most frequent `n` targets. If `min_freq == True`,
     `n` is instead interpreted as a min frequency threshold"""
-    if min_freq:
-        return targets_by_min(min_freq, corpus)
-    else:
-        counter = Counter((w for s in corpus for w in s))
-        return dict(counter.most_common(n)).keys()
+    counter = Counter((w for s in corpus for w in s))
+    return dict(counter.most_common(n)).keys()
 
 
 def sliding_window(seq, size=2, fillvalue=None):
@@ -114,13 +126,30 @@ def sliding_window(seq, size=2, fillvalue=None):
             output.extend([seq[k]] if k < len(seq) else [fillvalue])
         yield output
 
+class Progress(object):
+    def __init__(self, toolbar_width=40):
+        sys.stdout.write("[%s]" % (" " * toolbar_width))
+        sys.stdout.flush()
+        sys.stdout.write("\b" * (toolbar_width+1))
 
-def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
+    def update(self, s):
+        sys.stdout.write(s)
+        sys.stdout.flush()
+
+
+def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" ",
+                   verbose=True):
     "Word-level encoding of target words. Character-level encoding of contexts"
     word_indexer = Indexer()
     char_indexer = CharIndexer(PAD="|", BOS="", EOS="")
     X, y = [], []
-    for sent in sents:          # encoding
+    if verbose:
+        n = 0
+        progress = Progress()
+    for sent in sents:
+        n += 1
+        if verbose and (n % 1000) == 0:
+            progress.update("Done [%d] sentences" % n)
         for i, target in enumerate(sent):
             if targets and target not in targets:
                 continue
@@ -128,6 +157,10 @@ def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
             left = sep.join(sent[0:i])[-window:]
             left_idxs = char_indexer.pad_encode(left, window, pad_dir="left")
             X.append(left_idxs)
+    return X, y, word_indexer, char_indexer
+
+
+def encode_data(X, y, word_indexer, char_indexer, window=15, encoding="one_hot"):
     for i, context in enumerate(X):
         if encoding and encoding == "one_hot":
             X[i] = one_hot(context, window, char_indexer.vocab_len())
@@ -136,28 +169,37 @@ def build_contexts(sents, targets=None, window=15, encoding="one_hot", sep=" "):
     return X, y, word_indexer, char_indexer
 
 
-# def get_data(in_dir, n_sents, n_targets, **kwargs):
-#     # s1, s2 = tee(take(get_sents(in_dir), n_sents)) # assumes get_sents fits in mem
-#     sents = list(take(get_sents(in_dir), n_sents))
-#     targets = get_targets(n_targets, sents)
-#     X, y, word_indexer, char_indexer = build_contexts(sents, targets, **kwargs)
-#     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
-
 def get_data(in_dir, n_sents, n_targets, **kwargs):
     # mem efficient (build 2 gens)
     targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
     X, y, word_indexer, char_indexer = \
         build_contexts(take(get_sents(in_dir), n_sents), targets, **kwargs)
+    X, y, word_indexer, char_indexer = \
+        encode_data(X, y, word_indexer, char_indexer, **kwargs)
     return np.asarray(X), np.asarray(y), word_indexer, char_indexer
 
 
-def get_batches(in_dir, n_sents, n_targets, batch_size, w_idxr, c_idxr, **kwargs):
-    # assumes X, y fit in memory
-    targets = get_targets(n_targets, take(get_sents(in_dir), n_sents))
-    X, y, word_indexer, char_indexer = \
-        build_contexts(take(get_sents(in_dir), n_sents), targets, **kwargs)
-    w_idxr = word_indexer
-    c_idxr = char_indexer
-    for start in range(0, y.shape[0], batch_size):
-        end = start + batch_size
-        yield X[start:end], y[start:end]
+class MiniBatchGenerator(object):
+    def __init__(self, in_dir, n_sents, n_targets, batch_size, encoding, **kwargs):
+        self.batch_size = batch_size
+        X, y, word_indexer, char_indexer = \
+            get_data(in_dir, n_sents, n_targets, encoding=encoding, **kwargs)
+        self.X = X
+        self.y = y
+        self.word_indexer = word_indexer
+        self.char_indexer = char_indexer
+        self.iter_start = False
+
+    def train_test_split(self, test_split_size=0.001):
+        if self.iter_start:
+            print "WARNING: making test-train split after iterating"
+        max_test = self.y.shape[0] * test_split_size
+        X_test, y_test = self.X[:max_test], self.y[:max_test]
+        self.X, self.y = self.X[max_test:], self.y[max_test:]
+        return X_test, y_test
+
+    def __iter__(self):
+        
+        for start in range(0, self.y.shape[0], self.batch_size):
+            end = start + self.batch_size
+            yield self.X[start:end], self.y[start:end]
